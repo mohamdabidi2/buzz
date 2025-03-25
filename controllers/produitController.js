@@ -2,8 +2,9 @@ const Produit = require('../models/product');
 
 // Add new produit
 exports.addProduit = async (req, res) => {
+  console.log(req.body)
+
   try {
-    
     
     
     const produit = new Produit(req.body);
@@ -17,7 +18,7 @@ exports.addProduit = async (req, res) => {
 // Get all produits
 exports.getAllProduits = async (req, res) => {
   try {
-    console.log("heloo")
+   
     const produits = await Produit.find();
     res.status(200).json(produits);
   } catch (error) {
@@ -40,6 +41,7 @@ exports.getProduitById = async (req, res) => {
 
 // Update produit
 exports.updateProduit = async (req, res) => {
+  console.log(req.params.id, req.body)
   try {
     const produit = await Produit.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!produit) {
