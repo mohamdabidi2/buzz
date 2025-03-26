@@ -1,5 +1,5 @@
 const Recipe = require('../models/Recipe');
-const Produit = require('../models/Produit');
+const Produit = require('../models/product');
 
 // Create a new recipe
 exports.createRecipe = async (req, res) => {
