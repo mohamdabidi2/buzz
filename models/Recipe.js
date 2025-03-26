@@ -36,7 +36,11 @@ const recipeSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0
-  }
+  },
+  department_name: { 
+    type: String,
+    required: true
+  },
 }, { 
   timestamps: true 
 });
