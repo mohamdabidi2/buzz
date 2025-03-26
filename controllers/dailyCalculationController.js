@@ -1,6 +1,6 @@
 const DailyCalculation = require('../models/DailyCalculation');
 const Recipe = require('../models/Recipe');
-const Produit = require('../models/Produit');
+const Produit = require('../models/product');
 
 // Save or update daily calculations
 exports.saveDailyCalculations = async (req, res) => {
