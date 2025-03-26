@@ -12,7 +12,8 @@ const {
 const { 
   getAllUsers, 
   createUser, 
-  deleteUser 
+  deleteUser ,
+  updateUser
 } = require('../controllers/userController');
 
 const { 
@@ -73,6 +74,7 @@ router.get("/auth/me", authMiddleware, getMe);
 router.get("/users", getAllUsers);
 router.post("/users", createUser);
 router.delete("/users/:id", deleteUser);
+router.put("/users/:id", updateUser);
 
 // Product Routes
 router.post("/produits/add", addProduit);
