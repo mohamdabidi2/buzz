@@ -5,6 +5,7 @@ const produitSchema = new mongoose.Schema({
   barcode: { type: String, unique: true, sparse: true },
   unit: { type: String, required: true },
   min_stock: { type: Number, default: 0 },
+  price:{ type: Number, default: 0 }
 
 }, { timestamps: true });
 
