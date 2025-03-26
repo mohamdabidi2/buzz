@@ -1,4 +1,5 @@
 const Recipe = require('../models/Recipe');
+const Produit = require('../models/Produit');
 
 // Create a new recipe
 exports.createRecipe = async (req, res) => {
@@ -9,7 +10,29 @@ exports.createRecipe = async (req, res) => {
       return res.status(400).json({ error: 'Invalid recipe data' });
     }
 
-    const recipe = new Recipe({ name, products });
+    // Fetch product details for each product in the recipe
+    const enrichedProducts = await Promise.all(
+      products.map(async (product) => {
+        const productDetails = await Produit.findById(product.productId);
+        if (!productDetails) {
+          throw new Error(`Product not found: ${product.productId}`);
+        }
+        
+        return {
+          productId: product.productId,
+          quantity: product.quantity,
+          productName: productDetails.product_name,
+          unit: productDetails.unit,
+          price: productDetails.price
+        };
+      })
+    );
+
+    const recipe = new Recipe({ 
+      name, 
+      products: enrichedProducts 
+    });
+    
     await recipe.save();
 
     res.status(201).json(recipe);
@@ -18,10 +41,14 @@ exports.createRecipe = async (req, res) => {
   }
 };
 
-// Fetch all recipes
+// Fetch all recipes with populated product details
 exports.getRecipes = async (req, res) => {
   try {
-    const recipes = await Recipe.find().populate('products.productId', 'product_name');
+    const recipes = await Recipe.find().populate({
+      path: 'products.productId',
+      select: 'product_name unit price'
+    });
+    
     res.status(200).json(recipes);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -41,17 +68,25 @@ exports.calculateTotal = async (req, res) => {
 
     for (let calc of calculations) {
       const { recipeId, factor } = calc;
-      const recipe = await Recipe.findById(recipeId).populate('products.productId', 'product_name');
+      const recipe = await Recipe.findById(recipeId).populate({
+        path: 'products.productId',
+        select: 'product_name unit price'
+      });
 
       if (!recipe) continue;
 
       for (let item of recipe.products) {
         const productId = item.productId._id.toString();
         const productName = item.productId.product_name;
+        const unit = item.productId.unit;
         const totalQuantity = (item.quantity * factor);
 
         if (!totalQuantities[productId]) {
-          totalQuantities[productId] = { name: productName, totalQuantity };
+          totalQuantities[productId] = { 
+            name: productName, 
+            unit: unit,
+            totalQuantity 
+          };
         } else {
           totalQuantities[productId].totalQuantity += totalQuantity;
         }
