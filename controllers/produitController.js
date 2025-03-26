@@ -2,8 +2,7 @@ const Produit = require('../models/product');
 
 // Add new produit
 exports.addProduit = async (req, res) => {
-  console.log(req.body)
-
+  
   try {
     
     
