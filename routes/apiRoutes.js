@@ -77,11 +77,11 @@ router.delete("/users/:id", deleteUser);
 router.put("/users/:id", updateUser);
 
 // Product Routes
-router.post("/produits/add", addProduit);
+router.post("/produits/add",authMiddleware, addProduit);
 router.get("/produits", getAllProduits);
 router.get("/produits/:id", getProduitById);
-router.put("/produits/:id", updateProduit);
-router.delete("/produits/:id", deleteProduit);
+router.put("/produits/:id",authMiddleware, updateProduit);
+router.delete("/produits/:id",authMiddleware, deleteProduit);
 
 // Recipe Routes
 router.get("/recipes", getRecipes);
