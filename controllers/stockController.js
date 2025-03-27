@@ -143,7 +143,150 @@ exports.getAllStocks = async (req, res) => {
     });
   }
 };
+// Transfer product to trash department
+exports.transferToTrash = async (req, res) => {
+  try {
+    const { stock_id, quantity, notes } = req.body;
+    const userId = req.user.id;
 
+    // Validate input
+    if (!mongoose.Types.ObjectId.isValid(stock_id)) {
+      return res.status(400).json({ message: "Invalid stock ID" });
+    }
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity must be a positive number" });
+    }
+
+    // Find or create trash department
+    let trashDepartment = await Department.findOne({ name: /trash/i });
+    if (!trashDepartment) {
+      trashDepartment = new Department({
+        name: "Trash",
+        description: "Department for discarded items"
+      });
+      await trashDepartment.save();
+    }
+
+    // Find the source stock record
+    const sourceStock = await Stock.findById(stock_id).populate('produit department');
+    if (!sourceStock) {
+      return res.status(404).json({ message: "Stock record not found" });
+    }
+
+    // Check available quantity
+    if (sourceStock.quantity < quantity) {
+      return res.status(400).json({ 
+        message: "Not enough stock available",
+        available: sourceStock.quantity,
+        requested: quantity
+      });
+    }
+
+    // Update source stock
+    const oldSourceQuantity = sourceStock.quantity;
+    sourceStock.quantity -= quantity;
+    await sourceStock.save();
+
+    // Find or create trash stock record
+    let trashStock = await Stock.findOne({ 
+      produit: sourceStock.produit._id,
+      department: trashDepartment._id
+    });
+
+    if (trashStock) {
+      trashStock.quantity += quantity;
+      await trashStock.save();
+    } else {
+      trashStock = new Stock({
+        produit: sourceStock.produit._id,
+        department: trashDepartment._id,
+        quantity: quantity
+      });
+      await trashStock.save();
+    }
+
+    // Log activities
+    await logActivity(
+      'transfer_out',
+      'Stock',
+      sourceStock._id,
+      { 
+        quantity: { from: oldSourceQuantity, to: sourceStock.quantity },
+        transfer_to: trashDepartment._id,
+        transfer_quantity: quantity
+      },
+      userId
+    );
+
+    await logActivity(
+      'transfer_in',
+      'Stock',
+      trashStock._id,
+      { 
+        quantity: { from: (trashStock.quantity - quantity), to: trashStock.quantity },
+        transfer_from: sourceStock.department._id,
+        transfer_quantity: quantity
+      },
+      userId
+    );
+
+    // Log stock movements
+    const reference = notes || `Transfer to trash department`;
+    
+    await logStockMovement({
+      product: sourceStock.produit._id,
+      department: sourceStock.department._id,
+      quantity: quantity,
+      movementType: 'transfer_out',
+      reference: reference,
+      relatedDocument: sourceStock._id,
+      relatedDocumentType: 'Stock',
+      user: userId
+    });
+
+    await logStockMovement({
+      product: sourceStock.produit._id,
+      department: trashDepartment._id,
+      quantity: quantity,
+      movementType: 'transfer_in',
+      reference: reference,
+      relatedDocument: trashStock._id,
+      relatedDocumentType: 'Stock',
+      user: userId
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Product successfully transferred to trash department",
+      data: {
+        product: {
+          id: sourceStock.produit._id,
+          name: sourceStock.produit.product_name
+        },
+        from_department: {
+          id: sourceStock.department._id,
+          name: sourceStock.department.name,
+          remaining_quantity: sourceStock.quantity
+        },
+        trash_department: {
+          id: trashDepartment._id,
+          name: trashDepartment.name,
+          new_quantity: trashStock.quantity
+        },
+        transferred_quantity: quantity
+      }
+    });
+
+  } catch (error) {
+    console.error("Error transferring to trash department:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error processing transfer to trash department",
+      error: error.message 
+    });
+  }
+};
 // Transfer stock
 exports.transferStock = async (req, res) => {
   console.log('=== STARTING STOCK TRANSFER ===');
