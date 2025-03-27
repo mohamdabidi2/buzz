@@ -100,7 +100,7 @@ router.put("/departments/:id", updateDepartment);
 router.delete("/departments/:id", deleteDepartment);
 
 // Stock Routes
-router.post("/stocks/add", addStock);
+router.post("/stocks/add",authMiddleware, addStock);
 router.get("/stocks", getAllStocks);
 router.post("/stocks/transfer",authMiddleware,  transferStock);
 router.get("/stocks/department/:department",authMiddleware,  getStocksByDepartment);
