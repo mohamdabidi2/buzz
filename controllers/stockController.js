@@ -1,5 +1,6 @@
 const Stock = require('../models/stock');
 const Produit = require('../models/product');
+const mongoose = require('mongoose');
 const Department = require('../models/Department');
 const { logActivity, logStockMovement } = require('../helpers/logging');
 
@@ -614,6 +615,157 @@ exports.getTotalStockValue = async (req, res) => {
       success: false,
       error: 'Failed to calculate total stock value',
       details: error.message
+    });
+  }
+};
+// Add this to your stockController.js
+exports.transferToUsedDepartment = async (req, res) => {
+  try {
+    const { product_id, from_department_id, quantity, notes } = req.body;
+    const userId = req.user.id;
+
+    console.log('Transfer request:', { userId, product_id, from_department_id, quantity, notes });
+
+    // Validate input
+    if (!mongoose.Types.ObjectId.isValid(product_id)) {
+      return res.status(400).json({ message: "Invalid stock ID" });
+    }
+
+    if (typeof quantity !== 'number' || quantity <= 0) {
+      return res.status(400).json({ message: "Quantity must be a positive number" });
+    }
+
+    // Find the used department (assuming it's named "Used" or similar)
+    const usedDepartment = await Department.findOne({ name: /used/i });
+    if (!usedDepartment) {
+      return res.status(404).json({ message: "Used department not found" });
+    }
+
+    // Find the source stock record (since product_id is actually stock_id)
+    const fromStock = await Stock.findById(product_id).populate('produit department');
+    if (!fromStock) {
+      return res.status(404).json({ message: "Stock record not found" });
+    }
+
+    // Verify the department matches
+    const fromDepartment = await Department.findOne({ name: from_department_id });
+    if (!fromDepartment || !fromStock.department._id.equals(fromDepartment._id)) {
+      return res.status(400).json({ 
+        message: "Stock record does not belong to specified department" 
+      });
+    }
+
+    // Check available quantity
+    if (fromStock.quantity < quantity) {
+      return res.status(400).json({ 
+        message: "Not enough stock in the source department",
+        available: fromStock.quantity,
+        requested: quantity
+      });
+    }
+
+    // Process the transfer
+    const oldFromQuantity = fromStock.quantity;
+    fromStock.quantity -= quantity;
+    await fromStock.save();
+
+    // Find or create stock in used department
+    let usedStock = await Stock.findOne({ 
+      produit: fromStock.produit._id, 
+      department: usedDepartment._id 
+    });
+
+    let oldUsedQuantity = 0;
+    if (usedStock) {
+      oldUsedQuantity = usedStock.quantity;
+      usedStock.quantity += quantity;
+      await usedStock.save();
+    } else {
+      usedStock = new Stock({
+        produit: fromStock.produit._id,
+        department: usedDepartment._id,
+        quantity: quantity
+      });
+      await usedStock.save();
+    }
+
+    // Log activities
+    await logActivity(
+      'transfer_out',
+      'Stock',
+      fromStock._id,
+      { 
+        quantity: { from: oldFromQuantity, to: fromStock.quantity },
+        transfer_to: usedDepartment._id,
+        transfer_quantity: quantity
+      },
+      userId
+    );
+
+    await logActivity(
+      'transfer_in',
+      'Stock',
+      usedStock._id,
+      { 
+        quantity: { from: oldUsedQuantity, to: usedStock.quantity },
+        transfer_from: fromDepartment._id,
+        transfer_quantity: quantity
+      },
+      userId
+    );
+
+    // Log stock movements
+    const reference = notes || `Transfer to used department`;
+    
+    await logStockMovement({
+      product: fromStock.produit._id,
+      department: fromDepartment._id,
+      quantity: quantity,
+      movementType: 'transfer_out',
+      reference: reference,
+      relatedDocument: fromStock._id,
+      relatedDocumentType: 'Stock',
+      user: userId
+    });
+
+    await logStockMovement({
+      product: fromStock.produit._id,
+      department: usedDepartment._id,
+      quantity: quantity,
+      movementType: 'transfer_in',
+      reference: reference,
+      relatedDocument: usedStock._id,
+      relatedDocumentType: 'Stock',
+      user: userId
+    });
+
+    res.status(200).json({
+      message: "Product successfully transferred to used department",
+      data: {
+        product: {
+          id: fromStock.produit._id,
+          name: fromStock.produit.product_name
+        },
+        from_department: {
+          id: fromDepartment._id,
+          name: fromDepartment.name,
+          remaining_quantity: fromStock.quantity
+        },
+        used_department: {
+          id: usedDepartment._id,
+          name: usedDepartment.name,
+          new_quantity: usedStock.quantity
+        },
+        transferred_quantity: quantity,
+        timestamp: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error("Error transferring to used department:", error);
+    res.status(500).json({ 
+      message: "Error processing transfer to used department",
+      error: error.message 
     });
   }
 };
