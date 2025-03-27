@@ -110,7 +110,7 @@ router.get("/stocks/low", getLowStockItems);
 router.post('/stocks/transfer-to-used',authMiddleware, transferToUsedDepartment);
 router.post("/stocks/transfer",authMiddleware,  transferStock);
 router.get("/stocks/department/:department",authMiddleware,  getStocksByDepartment);
-router.post('/transfer-to-trash',authMiddleware,transferToTrash);
+router.post('/stocks/transfer-to-trash',authMiddleware,transferToTrash);
 router.get("/stocks/total-value",authMiddleware,  getTotalStockValue);
 
 // Daily Calculation Routes
