@@ -145,24 +145,42 @@ exports.getAllStocks = async (req, res) => {
 
 // Transfer stock
 exports.transferStock = async (req, res) => {
+  console.log('=== STARTING STOCK TRANSFER ===');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  console.log('User ID:', req.user.id);
+
   try {
     const { from_department, to_department, product_name, quantity, notes } = req.body;
     const userId = req.user.id;
 
     // Validate quantity
+    console.log('Validating quantity...');
     if (typeof quantity !== 'number' || quantity <= 0) {
+      console.error('Invalid quantity:', quantity);
       return res.status(400).json({ message: "Quantity must be a positive number" });
     }
 
-    // Fetch the department IDs from the database
+    // Fetch departments
+    console.log(`Fetching from department: ${from_department}`);
     const fromDepartmentData = await Department.findOne({ name: from_department });
+    console.log('From department data:', fromDepartmentData);
+
+    console.log(`Fetching to department: ${to_department}`);
     const toDepartmentData = await Department.findOne({ name: to_department });
+    console.log('To department data:', toDepartmentData);
 
-    // Fetch the product ID from the database
+    // Fetch product
+    console.log(`Fetching product: ${product_name}`);
     const productData = await Produit.findOne({ product_name });
+    console.log('Product data:', productData);
 
-    // Check if the departments and product exist
+    // Validate existence
     if (!fromDepartmentData || !toDepartmentData || !productData) {
+      console.error('Validation failed - missing data:', {
+        fromExists: !!fromDepartmentData,
+        toExists: !!toDepartmentData,
+        productExists: !!productData
+      });
       return res.status(400).json({ 
         message: "Invalid department or product name",
         details: {
@@ -173,13 +191,19 @@ exports.transferStock = async (req, res) => {
       });
     }
 
-    // Decrease quantity from the source department
+    // Check source stock
+    console.log('Checking source stock...');
     const fromStock = await Stock.findOne({ 
       produit: productData._id, 
       department: fromDepartmentData._id 
     });
-    
+    console.log('Source stock:', fromStock);
+
     if (!fromStock || fromStock.quantity < quantity) {
+      console.error('Insufficient stock:', {
+        available: fromStock ? fromStock.quantity : 0,
+        requested: quantity
+      });
       return res.status(400).json({ 
         message: "Not enough stock in the source department",
         available_quantity: fromStock ? fromStock.quantity : 0,
@@ -187,31 +211,40 @@ exports.transferStock = async (req, res) => {
       });
     }
 
+    // Process transfer
+    console.log('Processing transfer...');
     const oldFromQuantity = fromStock.quantity;
     fromStock.quantity -= quantity;
     await fromStock.save();
+    console.log('Updated source stock:', fromStock);
 
-    // Increase quantity in the destination department
+    // Handle destination
+    console.log('Handling destination...');
     const toStock = await Stock.findOne({ 
       produit: productData._id, 
       department: toDepartmentData._id 
     });
-    
+    console.log('Existing destination stock:', toStock);
+
     let oldToQuantity = 0;
     if (toStock) {
       oldToQuantity = toStock.quantity;
       toStock.quantity += quantity;
       await toStock.save();
+      console.log('Updated destination stock:', toStock);
     } else {
+      console.log('Creating new destination stock entry');
       const newStock = new Stock({ 
         produit: productData._id, 
         department: toDepartmentData._id, 
         quantity 
       });
       await newStock.save();
+      console.log('Created new stock:', newStock);
     }
 
-    // Log activities for both departments
+    // Log activities
+    console.log('Logging activities...');
     await logActivity(
       'update',
       'Stock',
@@ -242,7 +275,8 @@ exports.transferStock = async (req, res) => {
       );
     }
 
-    // Log stock movements (out from source, in to destination)
+    // Log stock movements
+    console.log('Logging stock movements...');
     const reference = notes || `Transfer between departments`;
     
     await logStockMovement({
@@ -267,6 +301,7 @@ exports.transferStock = async (req, res) => {
       user: userId
     });
 
+    console.log('=== TRANSFER COMPLETED SUCCESSFULLY ===');
     res.status(200).json({ 
       message: "Stock transferred successfully",
       details: {
@@ -277,15 +312,20 @@ exports.transferStock = async (req, res) => {
         timestamp: new Date()
       }
     });
+
   } catch (error) {
-    console.error("Transfer error:", error);
+    console.error('=== TRANSFER FAILED ===');
+    console.error('Error:', error);
+    console.error('Stack trace:', error.stack);
+    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    
     res.status(500).json({ 
       message: "Error processing stock transfer",
-      error: error.message 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
-
 // Get stocks by department
 exports.getStocksByDepartment = async (req, res) => {
   try {
