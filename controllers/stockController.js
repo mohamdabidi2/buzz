@@ -559,3 +559,61 @@ exports.getProductStockHistory = async (req, res) => {
     });
   }
 };
+// Add this to your stockController.js
+exports.getTotalStockValue = async (req, res) => {
+  try {
+    // Aggregate all stock values
+    const stocks = await Stock.aggregate([
+      {
+        $lookup: {
+          from: 'produits', // Collection name for products
+          localField: 'produit',
+          foreignField: '_id',
+          as: 'product'
+        }
+      },
+      { $unwind: '$product' },
+      {
+        $project: {
+          productId: '$produit',
+          productName: '$product.product_name',
+          department: '$department',
+          quantity: '$quantity',
+          unitPrice: '$product.price',
+          totalValue: { $multiply: ['$quantity', '$product.price'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalValue: { $sum: '$totalValue' },
+          items: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // If no stocks found
+    if (stocks.length === 0) {
+      return res.status(200).json({
+        success: true,
+        totalValue: 0,
+        itemCount: 0
+      });
+    }
+
+    // Return the total value
+    res.status(200).json({
+      success: true,
+      totalValue: stocks[0].totalValue,
+      itemCount: stocks[0].items
+    });
+
+  } catch (error) {
+    console.error('Error calculating total stock value:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to calculate total stock value',
+      details: error.message
+    });
+  }
+};

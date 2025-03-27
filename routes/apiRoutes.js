@@ -47,7 +47,8 @@ const {
   getAllStocks, 
   transferStock, 
   getStocksByDepartment ,
-  getLowStockItems
+  getLowStockItems,
+  getTotalStockValue
 } = require('../controllers/stockController');
 
 const { 
@@ -106,6 +107,7 @@ router.get("/stocks", getAllStocks);
 router.get("/stocks/low", getLowStockItems);
 router.post("/stocks/transfer",authMiddleware,  transferStock);
 router.get("/stocks/department/:department",authMiddleware,  getStocksByDepartment);
+router.get("/stocks/total-value",authMiddleware,  getTotalStockValue);
 
 // Daily Calculation Routes
 router.post("/calcule", saveDailyCalculations);
