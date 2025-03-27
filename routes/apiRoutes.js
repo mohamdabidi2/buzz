@@ -10,6 +10,9 @@ const {
 } = require('../controllers/authController');
 
 const { 
+    compareIngredientUsage
+  } = require('../controllers/reportController');
+const { 
   getAllUsers, 
   createUser, 
   deleteUser ,
@@ -123,5 +126,9 @@ router.get("/logs/stock-movements", authMiddleware, getStockMovements);
 router.get("/logs/products/:id/movements", authMiddleware, getProductMovementHistory);
 router.get("/logs/activity-logs", authMiddleware, getActivityLogs);
 router.get("/logs/activity/:entityType/:entityId", authMiddleware, getEntityActivity);
+
+//Report Routes
+router.get("/reports/ingredient-comparison", authMiddleware, compareIngredientUsage);
+
 
 module.exports = router;
