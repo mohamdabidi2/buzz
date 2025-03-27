@@ -102,8 +102,8 @@ router.delete("/departments/:id", deleteDepartment);
 // Stock Routes
 router.post("/stocks/add", addStock);
 router.get("/stocks", getAllStocks);
-router.post("/stocks/transfer", transferStock);
-router.get("/stocks/department/:department", getStocksByDepartment);
+router.post("/stocks/transfer",authMiddleware,  transferStock);
+router.get("/stocks/department/:department",authMiddleware,  getStocksByDepartment);
 
 // Daily Calculation Routes
 router.post("/calcule", saveDailyCalculations);
