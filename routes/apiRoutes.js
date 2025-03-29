@@ -64,7 +64,8 @@ const {
 
 const { 
   getStockMovements, 
-  getProductMovementHistory 
+  getProductMovementHistory ,
+  getDepartmentTransfers
 } = require('../controllers/stockMovementController');
 
 const { 
@@ -126,7 +127,8 @@ router.get("/logs/stock-movements", authMiddleware, getStockMovements);
 router.get("/logs/products/:id/movements", authMiddleware, getProductMovementHistory);
 router.get("/logs/activity-logs", authMiddleware, getActivityLogs);
 router.get("/logs/activity/:entityType/:entityId", authMiddleware, getEntityActivity);
-
+// Add this to your apiRoutes.js
+router.get("/logs/department-transfers", authMiddleware, getDepartmentTransfers);
 //Report Routes
 router.get("/reports/ingredient-comparison", authMiddleware, compareIngredientUsage);
 
