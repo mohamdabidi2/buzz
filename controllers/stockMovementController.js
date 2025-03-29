@@ -43,19 +43,22 @@ exports.getDepartmentTransfers = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    // Validate date inputs
-    if (!startDate || !endDate) {
+    // Validate startDate input
+    if (!startDate) {
       return res.status(400).json({ 
-        message: "Both startDate and endDate are required" 
+        message: "startDate is required" 
       });
     }
+
+    // If endDate not provided, use startDate as endDate
+    const effectiveEndDate = endDate || startDate;
 
     // Query for transfer movements within date range
     const query = {
       movementType: { $in: ['transfer_in', 'transfer_out'] },
       createdAt: {
         $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $lte: new Date(effectiveEndDate)
       }
     };
 
