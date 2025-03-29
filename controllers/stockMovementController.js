@@ -39,15 +39,15 @@ exports.getProductMovementHistory = async (req, res) => {
   }
 };
 
-
-
 exports.getDepartmentTransfers = async (req, res) => {
   try {
       const { startDate, endDate, departmentId } = req.query;
 
       // Validate inputs
-      if (!startDate) {
-          return res.status(400).json({ message: "startDate is required" });
+      if (!startDate || !departmentId) {
+          return res.status(400).json({ 
+              message: "startDate and departmentId are required" 
+          });
       }
 
       // Set date ranges
@@ -57,25 +57,22 @@ exports.getDepartmentTransfers = async (req, res) => {
       const dayBeforeStart = new Date(startDateObj);
       dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
 
-      // Build base query with department filter if provided
-      const baseQuery = departmentId ? { department: departmentId } : {};
-
-      // 1. Get initial stock (day before start)
+      // 1. Get initial stock for the department (day before start)
       const initialStocks = await Stock.find({
-          ...baseQuery,
+          department: departmentId,
           createdAt: { $lte: dayBeforeStart }
       }).populate('produit department');
 
-      // 2. Get all transfer movements in the period
+      // 2. Get all transfer movements for the department in the period
       const movements = await StockMovement.find({
-          ...baseQuery,
+          department: departmentId,
           movementType: { $in: ['transfer_in', 'transfer_out'] },
           createdAt: { $gte: startDateObj, $lte: endDateObj }
       }).populate('product department');
 
-      // 3. Get all entry movements (for initial stock calculation)
+      // 3. Get all entry movements for the department (for initial stock calculation)
       const entryMovements = await StockMovement.find({
-          ...baseQuery,
+          department: departmentId,
           movementType: 'entry',
           createdAt: { $lte: endDateObj } // All entries up to end date
       }).populate('product');
@@ -165,26 +162,19 @@ exports.getDepartmentTransfers = async (req, res) => {
           totalValue: (product.initialStock + product.entries + product.transfersIn) * product.price
       }));
 
-      // Filter only products with transfers (used/trash) or stock movements
-      const filteredReport = reportData.filter(product => 
-          product.transfersToUsed > 0 || 
-          product.transfersToTrash > 0 ||
-          product.currentStock > 0
-      );
-
       // 6. Send response
       res.status(200).json({
           success: true,
-          data: filteredReport,
+          data: reportData,
           period: {
               start: startDate,
               end: effectiveEndDate
           },
           totals: {
-              totalInitialValue: filteredReport.reduce((sum, p) => sum + p.initialStock * p.price, 0),
-              totalCurrentValue: filteredReport.reduce((sum, p) => sum + p.currentStock * p.price, 0),
-              totalTransfersToUsed: filteredReport.reduce((sum, p) => sum + p.transfersToUsed, 0),
-              totalTransfersToTrash: filteredReport.reduce((sum, p) => sum + p.transfersToTrash, 0)
+              totalInitialValue: reportData.reduce((sum, p) => sum + p.initialStock * p.price, 0),
+              totalCurrentValue: reportData.reduce((sum, p) => sum + p.currentStock * p.price, 0),
+              totalTransfersToUsed: reportData.reduce((sum, p) => sum + p.transfersToUsed, 0),
+              totalTransfersToTrash: reportData.reduce((sum, p) => sum + p.transfersToTrash, 0)
           }
       });
 
