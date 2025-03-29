@@ -1,5 +1,8 @@
 const StockMovement = require('../models/StockMovement');
 const Stock = require('../models/stock'); // Your stock model
+const Department = require('../models/Department'); // Your stock model
+const mongoose = require('mongoose');
+
 exports.getStockMovements = async (req, res) => {
   try {
     const { product, department, movementType, startDate, endDate } = req.query;
@@ -39,6 +42,7 @@ exports.getProductMovementHistory = async (req, res) => {
   }
 };
 
+
 exports.getDepartmentTransfers = async (req, res) => {
   try {
       const { startDate, endDate, departmentId } = req.query;
@@ -57,22 +61,37 @@ exports.getDepartmentTransfers = async (req, res) => {
       const dayBeforeStart = new Date(startDateObj);
       dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
 
+      let departmentObjectId = departmentId;
+      
+      // Check if departmentId is not a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(departmentId)) {
+          // Search for department by name
+          const department = await Department.findOne({ name: departmentId });
+          if (!department) {
+              return res.status(404).json({
+                  success: false,
+                  message: "Department not found"
+              });
+          }
+          departmentObjectId = department._id;
+      }
+
       // 1. Get initial stock for the department (day before start)
       const initialStocks = await Stock.find({
-          department: departmentId,
+          department: departmentObjectId,
           createdAt: { $lte: dayBeforeStart }
       }).populate('produit department');
 
       // 2. Get all transfer movements for the department in the period
       const movements = await StockMovement.find({
-          department: departmentId,
+          department: departmentObjectId,
           movementType: { $in: ['transfer_in', 'transfer_out'] },
           createdAt: { $gte: startDateObj, $lte: endDateObj }
       }).populate('product department');
 
       // 3. Get all entry movements for the department (for initial stock calculation)
       const entryMovements = await StockMovement.find({
-          department: departmentId,
+          department: departmentObjectId,
           movementType: 'entry',
           createdAt: { $lte: endDateObj } // All entries up to end date
       }).populate('product');
