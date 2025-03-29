@@ -42,7 +42,6 @@ exports.getProductMovementHistory = async (req, res) => {
   }
 };
 
-
 exports.getDepartmentTransfers = async (req, res) => {
   try {
       const { startDate, endDate, departmentId } = req.query;
@@ -58,8 +57,20 @@ exports.getDepartmentTransfers = async (req, res) => {
       const effectiveEndDate = endDate || startDate;
       const startDateObj = new Date(startDate);
       const endDateObj = new Date(effectiveEndDate);
+      
+      // If start and end dates are the same, we only want that day's data
+      const isSameDay = startDate === effectiveEndDate;
+      
+      // For same day, initial stock is from end of previous day
       const dayBeforeStart = new Date(startDateObj);
       dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+      
+      // For same day query, we want to include all movements from that exact day
+      // So we set the time range to cover the entire day
+      if (isSameDay) {
+          startDateObj.setHours(0, 0, 0, 0);
+          endDateObj.setHours(23, 59, 59, 999);
+      }
 
       let departmentObjectId = departmentId;
       
@@ -79,7 +90,7 @@ exports.getDepartmentTransfers = async (req, res) => {
       // 1. Get initial stock for the department (day before start)
       const initialStocks = await Stock.find({
           department: departmentObjectId,
-          createdAt: { $lte: dayBeforeStart }
+          createdAt: { $lte: isSameDay ? dayBeforeStart : startDateObj }
       }).populate('produit department');
 
       // 2. Get all transfer movements for the department in the period
@@ -93,7 +104,7 @@ exports.getDepartmentTransfers = async (req, res) => {
       const entryMovements = await StockMovement.find({
           department: departmentObjectId,
           movementType: 'entry',
-          createdAt: { $lte: endDateObj } // All entries up to end date
+          createdAt: { $lte: isSameDay ? dayBeforeStart : endDateObj } // All entries up to previous day for same day query
       }).populate('product');
 
       // 4. Process data
@@ -173,9 +184,10 @@ exports.getDepartmentTransfers = async (req, res) => {
           name: product.name,
           unit: product.unit,
           price: product.price,
-          initialStock: product.initialStock + product.entries + product.transfersIn,
+          initialStock: product.initialStock + product.entries,
           transfersToUsed: product.transfersToUsed,
           transfersToTrash: product.transfersToTrash,
+          transfersIn: product.transfersIn,
           currentStock: (product.initialStock + product.entries + product.transfersIn) - 
                        (product.transfersToUsed + product.transfersToTrash),
           totalValue: (product.initialStock + product.entries + product.transfersIn) * product.price
@@ -187,13 +199,15 @@ exports.getDepartmentTransfers = async (req, res) => {
           data: reportData,
           period: {
               start: startDate,
-              end: effectiveEndDate
+              end: effectiveEndDate,
+              isSingleDay: isSameDay
           },
           totals: {
               totalInitialValue: reportData.reduce((sum, p) => sum + p.initialStock * p.price, 0),
               totalCurrentValue: reportData.reduce((sum, p) => sum + p.currentStock * p.price, 0),
               totalTransfersToUsed: reportData.reduce((sum, p) => sum + p.transfersToUsed, 0),
-              totalTransfersToTrash: reportData.reduce((sum, p) => sum + p.transfersToTrash, 0)
+              totalTransfersToTrash: reportData.reduce((sum, p) => sum + p.transfersToTrash, 0),
+              totalTransfersIn: reportData.reduce((sum, p) => sum + p.transfersIn, 0)
           }
       });
 
