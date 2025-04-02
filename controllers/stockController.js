@@ -120,29 +120,28 @@ exports.addStock = async (req, res) => {
 exports.getAllStocks = async (req, res) => {
   try {
     const stocks = await Stock.find()
-      .populate('produit department') // Populate the references
+      .populate('produit department')
       .sort({ updatedAt: -1 });
 
     const formattedStocks = stocks.map(stock => ({
       stock_id: stock._id,
-      product: {
-        id: stock.produit?._id,
-        name: stock.produit?.product_name,
-        barcode: stock.produit?.barcode,
-        unit: stock.produit?.unit
-      },
-      department_id:stock.department?._id,
-      department_name: stock.department?.name
-      ,
-      quantity: stock.quantity,
-      last_updated: stock.updatedAt
+      produit_id: stock.produit?._id,       // For reference
+      product_name: stock.produit?.product_name,  // For display
+      barcode: stock.produit?.barcode,      // For scanning
+      unit: stock.produit?.unit,            // For quantity display
+      department_id: stock.department?._id, // For reference
+      department_name: stock.department?.name, // For display
+      quantity: stock.quantity,             // Current stock level
+      last_updated: stock.updatedAt         // For sorting/filtering
     }));
 
     res.status(200).json(formattedStocks);
   } catch (error) {
+    console.error('Stock fetch error:', error);
     res.status(500).json({ 
       message: "Error fetching stocks",
-      error: error.message 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
