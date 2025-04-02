@@ -131,10 +131,9 @@ exports.getAllStocks = async (req, res) => {
         barcode: stock.produit?.barcode,
         unit: stock.produit?.unit
       },
-      department: {
-        id: stock.department?._id,
-        name: stock.department?.name
-      },
+      department_id:stock.department?._id,
+      department_name: stock.department?.name
+      ,
       quantity: stock.quantity,
       last_updated: stock.updatedAt
     }));
