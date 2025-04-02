@@ -120,17 +120,13 @@ exports.addStock = async (req, res) => {
 exports.getAllStocks = async (req, res) => {
   try {
     const stocks = await Stock.find()
-      .populate('produit department')
       .sort({ updatedAt: -1 });
 
+    // Format stocks to match what frontend expects
     const formattedStocks = stocks.map(stock => ({
       stock_id: stock._id,
-      produit_id: stock.produit._id,
-      product_name: stock.produit.product_name,
-      barcode: stock.produit.barcode,
-      unit: stock.produit.unit,
-      department_id: stock.department._id,
-      department_name: stock.department.name,
+      product_name: stock.product_name, // Direct field access
+      department_name: stock.department, // Direct field access
       quantity: stock.quantity,
       last_updated: stock.updatedAt
     }));
